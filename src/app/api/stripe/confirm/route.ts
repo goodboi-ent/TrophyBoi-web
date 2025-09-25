@@ -2,7 +2,11 @@ import Stripe from 'stripe';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
+// Some Stripe SDK versions don't expose `current_period_end` in their TS defs.
+// Narrow the type to include it (optional).
+type SubWithPeriod = Stripe.Subscription & { current_period_end?: number };
 
 type ConfirmResponse = { ok?: true; status?: string; error?: string };
 
@@ -22,9 +26,10 @@ export async function GET(req: Request) {
       return NextResponse.json<ConfirmResponse>({ error: 'Missing subscription or user metadata' }, { status: 400 });
     }
 
-    const currentPeriodEnd = sub.current_period_end
-      ? new Date(sub.current_period_end * 1000).toISOString()
-      : null;
+    // Safely read current_period_end if available
+    const s = sub as SubWithPeriod;
+    const currentPeriodEnd =
+      s.current_period_end ? new Date(s.current_period_end * 1000).toISOString() : null;
 
     const { error } = await supabaseAdmin
       .from('subscriptions')

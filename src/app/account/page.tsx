@@ -1,8 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabaseClient';
+
+/** Tell Next this page is dynamic (don't prerender it) */
+export const dynamic = 'force-dynamic';
 
 type SubRow = {
   status: string | null;
@@ -10,20 +14,22 @@ type SubRow = {
   stripe_customer_id: string | null;
 } | null;
 
-export default function AccountPage() {
+function AccountContent() {
+  const sp = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [sub, setSub] = useState<SubRow>(null);
   const [confirmErr, setConfirmErr] = useState<string | null>(null);
-  const sp = useSearchParams();
 
+  // Load the current user
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
   }, []);
 
-  // After Stripe redirect, confirm once
+  // If returning from Stripe (/account?session_id=...), confirm once
   useEffect(() => {
     const sessionId = sp.get('session_id');
     if (!sessionId) return;
+
     (async () => {
       try {
         const r = await fetch(`/api/stripe/confirm?session_id=${encodeURIComponent(sessionId)}`);
@@ -36,7 +42,7 @@ export default function AccountPage() {
     })();
   }, [sp]);
 
-  // Load latest sub row
+  // Load latest subscription row for this user
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getUser();
@@ -54,19 +60,32 @@ export default function AccountPage() {
   }, []);
 
   const email = user?.email ?? user?.id ?? 'Unknown user';
-  const active = !!sub && ['active','trialing'].includes(sub.status ?? '') &&
+  const active =
+    !!sub &&
+    ['active', 'trialing'].includes(sub.status ?? '') &&
     (!sub.current_period_end || new Date(sub.current_period_end).getTime() > Date.now());
 
   async function openBillingPortal() {
-    if (!sub?.stripe_customer_id) { alert('No billing record found yet.'); return; }
+    if (!sub?.stripe_customer_id) {
+      alert('No billing record found yet.');
+      return;
+    }
     const res = await fetch('/api/billing/portal', {
       method: 'POST',
-      headers: { 'Content-Type':'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customerId: sub.stripe_customer_id }),
     });
     const data: { url?: string; error?: string } = await res.json();
     if (data.url) location.href = data.url;
     else alert(data.error || 'Could not open billing portal');
+  }
+
+  if (!user) {
+    return (
+      <main className="max-w-md mx-auto p-6">
+        <p>Not signed in. <a className="underline" href="/login">Go to login</a></p>
+      </main>
+    );
   }
 
   return (
@@ -94,10 +113,20 @@ export default function AccountPage() {
 
       <button
         className="border rounded px-3 py-2"
-        onClick={() => supabase.auth.signOut().then(()=>location.href='/')}
+        onClick={() => supabase.auth.signOut().then(() => (location.href = '/'))}
       >
         Sign out
       </button>
     </main>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense
+      fallback={<main className="max-w-md mx-auto p-6">Loading account…</main>}
+    >
+      <AccountContent />
+    </Suspense>
   );
 }

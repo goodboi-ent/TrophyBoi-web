@@ -1,14 +1,23 @@
 import Stripe from 'stripe';
 import { NextResponse } from 'next/server';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
+type CheckoutRequest = { priceId?: string; email?: string; userId?: string };
+type CheckoutResponse = { url: string } | { error: string };
 
 export async function POST(req: Request) {
   try {
-    const { priceId, email, userId } = await req.json();
+    const body = (await req.json()) as CheckoutRequest;
+
+    const priceId = body.priceId ?? '';
+    const email   = body.email   ?? '';
+    const userId  = body.userId  ?? '';
+
     if (!priceId || !email || !userId) {
-      return NextResponse.json({ error: 'Missing priceId, email, or userId' }, { status: 400 });
+      return NextResponse.json<CheckoutResponse>({ error: 'Missing priceId, email, or userId' }, { status: 400 });
     }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
@@ -17,13 +26,10 @@ export async function POST(req: Request) {
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/pricing`,
       metadata: { user_id: userId },
     });
-    return NextResponse.json({ url: session.url }, { status: 200 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message ?? 'Checkout error' }, { status: 500 });
-  }
-}
 
-export function GET() {
-  // Helpful for testing route existence via browser: should return 405, not 404
-  return NextResponse.json({ error: 'Use POST' }, { status: 405 });
+    return NextResponse.json<CheckoutResponse>({ url: session.url ?? '' }, { status: 200 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json<CheckoutResponse>({ error: msg }, { status: 500 });
+  }
 }
