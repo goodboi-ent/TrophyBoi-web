@@ -1,19 +1,23 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabaseClient';
 
-type User = { id: string; email: string | null } | null;
-type SubRow = { status: string | null; current_period_end: string | null; stripe_customer_id: string | null } | null;
+type SubRow = {
+  status: string | null;
+  current_period_end: string | null;
+  stripe_customer_id: string | null;
+} | null;
 
 export default function AccountPage() {
-  const [user, setUser] = useState<User>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [sub, setSub] = useState<SubRow>(null);
   const [confirmErr, setConfirmErr] = useState<string | null>(null);
   const sp = useSearchParams();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser((data.user as any) ?? null));
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
   }, []);
 
   // After Stripe redirect, confirm once
@@ -23,10 +27,11 @@ export default function AccountPage() {
     (async () => {
       try {
         const r = await fetch(`/api/stripe/confirm?session_id=${encodeURIComponent(sessionId)}`);
-        const data = await r.json();
+        const data: { ok?: boolean; status?: string; error?: string } = await r.json();
         if (!r.ok) throw new Error(data.error || 'confirm failed');
-      } catch (e: any) {
-        setConfirmErr(String(e.message || e));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setConfirmErr(msg);
       }
     })();
   }, [sp]);
@@ -34,17 +39,17 @@ export default function AccountPage() {
   // Load latest sub row
   useEffect(() => {
     (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const u = auth.user as any;
+      const { data } = await supabase.auth.getUser();
+      const u = data.user;
       if (!u) return;
-      const { data } = await supabase
+      const { data: row } = await supabase
         .from('subscriptions')
         .select('status,current_period_end,stripe_customer_id')
         .eq('user_id', u.id)
         .order('current_period_end', { ascending: false })
         .limit(1)
         .maybeSingle<SubRow>();
-      setSub(data ?? null);
+      setSub(row ?? null);
     })();
   }, []);
 
@@ -53,13 +58,13 @@ export default function AccountPage() {
     (!sub.current_period_end || new Date(sub.current_period_end).getTime() > Date.now());
 
   async function openBillingPortal() {
-    if (!sub?.stripe_customer_id) return alert('No billing record found yet.');
+    if (!sub?.stripe_customer_id) { alert('No billing record found yet.'); return; }
     const res = await fetch('/api/billing/portal', {
       method: 'POST',
       headers: { 'Content-Type':'application/json' },
       body: JSON.stringify({ customerId: sub.stripe_customer_id }),
     });
-    const data = await res.json();
+    const data: { url?: string; error?: string } = await res.json();
     if (data.url) location.href = data.url;
     else alert(data.error || 'Could not open billing portal');
   }

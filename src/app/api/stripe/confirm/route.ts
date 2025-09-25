@@ -4,19 +4,22 @@ import { supabaseAdmin } from '../../../../lib/supabaseAdmin';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
 
+type ConfirmResponse = { ok?: true; status?: string; error?: string };
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const sessionId = searchParams.get('session_id');
-    if (!sessionId) return NextResponse.json({ error: 'Missing session_id' }, { status: 400 });
+    if (!sessionId) return NextResponse.json<ConfirmResponse>({ error: 'Missing session_id' }, { status: 400 });
 
     const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['subscription'] });
 
     const sub = session.subscription as Stripe.Subscription | null;
-    const userId = (session.metadata as any)?.user_id as string | undefined;
+    const meta = session.metadata as Record<string, string> | null;
+    const userId = meta?.user_id;
 
     if (!sub || !userId) {
-      return NextResponse.json({ error: 'Missing subscription or user metadata' }, { status: 400 });
+      return NextResponse.json<ConfirmResponse>({ error: 'Missing subscription or user metadata' }, { status: 400 });
     }
 
     const currentPeriodEnd = sub.current_period_end
@@ -36,10 +39,11 @@ export async function GET(req: Request) {
         { onConflict: 'stripe_subscription_id' }
       );
 
-    if (error) throw error;
+    if (error) throw new Error(error.message);
 
-    return NextResponse.json({ ok: true, status: sub.status }, { status: 200 });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message ?? 'confirm error' }, { status: 500 });
+    return NextResponse.json<ConfirmResponse>({ ok: true, status: sub.status }, { status: 200 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return NextResponse.json<ConfirmResponse>({ error: msg }, { status: 500 });
   }
 }

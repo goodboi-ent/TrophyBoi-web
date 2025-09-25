@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabaseClient';
 
 export default function PricingPage() {
@@ -9,7 +10,7 @@ export default function PricingPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      const u = data.user as any;
+      const u = data.user as User | null;
       setEmail(u?.email ?? null);
       setUserId(u?.id ?? null);
     });
@@ -31,7 +32,7 @@ export default function PricingPage() {
         userId,
       }),
     });
-    const data = await res.json();
+    const data: { url?: string; error?: string } = await res.json();
     setLoading(false);
     if (data.url) location.href = data.url;
     else alert(data.error || 'Checkout error');
