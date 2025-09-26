@@ -11,6 +11,8 @@
   "dependencies": {
     "@mux/mux-player-react": "^3.6.0",
     "@supabase/supabase-js": "^2.57.4",
+    "embla-carousel": "^8.6.0",
+    "embla-carousel-react": "^8.6.0",
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
