@@ -1,5 +1,6 @@
 'use client';
 
+import SignOutButton from '../../components/SignOutButton';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { User } from '@supabase/supabase-js';
@@ -224,6 +225,7 @@ export default function VideosPage() {
         <div className="flex gap-3">
           {!user && <a className="underline" href="/login">Sign in</a>}
           {!isMember && <a className="underline" href="/pricing">Subscribe</a>}
+	  {user && <SignOutButton />}
         </div>
       </header>
 

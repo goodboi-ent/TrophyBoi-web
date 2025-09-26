@@ -7,10 +7,7 @@ import { supabase } from '../../../lib/supabaseClient';
 
 export const dynamic = 'force-dynamic';
 
-type SubRow = {
-  status: string | null;
-  current_period_end: string | null;
-} | null;
+type SubRow = { status: string | null; current_period_end: string | null } | null;
 
 function CallbackInner() {
   const router = useRouter();
@@ -18,44 +15,30 @@ function CallbackInner() {
 
   useEffect(() => {
     (async () => {
-      // 1) If the provider sent tokens in the hash (/#access_token=...), set the session
       if (typeof window !== 'undefined' && window.location.hash) {
-        const hash = window.location.hash.startsWith('#')
-          ? window.location.hash.slice(1)
-          : window.location.hash;
-        const hp = new URLSearchParams(hash);
+        const raw = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+        const hp = new URLSearchParams(raw);
         const access_token = hp.get('access_token');
         const refresh_token = hp.get('refresh_token');
-
         if (access_token && refresh_token) {
           const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-          // Clean the URL (remove the hash)
           window.history.replaceState({}, '', window.location.pathname);
-          if (error) {
-            router.replace('/login?error=callback-hash');
-            return;
-          }
+          if (error) return router.replace('/login?error=callback-hash');
         }
       }
 
-      // 2) If using PKCE (?code=...), exchange for a session
       const code = searchParams.get('code');
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          router.replace('/login?error=callback-code');
-          return;
-        }
+        if (error) return router.replace('/login?error=callback-code');
       }
 
-      // 3) Confirm we have a user
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.replace('/login?error=nouser');
-        return;
-      }
+      if (!user) return router.replace('/login?error=nouser');
 
-      // 4) Check latest subscription and route
+      const desiredUsername = (user.user_metadata as any)?.username ?? null;
+      await supabase.from('profiles').upsert({ user_id: user.id, username: desiredUsername });
+
       const { data } = await supabase
         .from('subscriptions')
         .select('status,current_period_end')
@@ -65,8 +48,8 @@ function CallbackInner() {
         .maybeSingle<SubRow>();
 
       const active = !!data
-        && ['active','trialing'].includes(data.status ?? '')
-        && (!data.current_period_end || new Date(data.current_period_end).getTime() > Date.now());
+        && ['active','trialing'].includes(data?.status ?? '')
+        && (!data?.current_period_end || new Date(data.current_period_end).getTime() > Date.now());
 
       router.replace(active ? '/videos' : '/pricing');
     })();
