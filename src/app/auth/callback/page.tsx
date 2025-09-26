@@ -8,6 +8,7 @@ import { supabase } from '../../../lib/supabaseClient';
 export const dynamic = 'force-dynamic';
 
 type SubRow = { status: string | null; current_period_end: string | null } | null;
+type UserMeta = { username?: string } | null | undefined;
 
 function CallbackInner() {
   const router = useRouter();
@@ -15,6 +16,7 @@ function CallbackInner() {
 
   useEffect(() => {
     (async () => {
+      // Handle providers that return tokens in the hash
       if (typeof window !== 'undefined' && window.location.hash) {
         const raw = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
         const hp = new URLSearchParams(raw);
@@ -27,18 +29,23 @@ function CallbackInner() {
         }
       }
 
+      // Handle PKCE code flow (?code=...)
       const code = searchParams.get('code');
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) return router.replace('/login?error=callback-code');
       }
 
+      // We should have a session now
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return router.replace('/login?error=nouser');
 
-      const desiredUsername = (user.user_metadata as any)?.username ?? null;
+      // Ensure a profiles row exists
+      const meta = user.user_metadata as UserMeta;
+      const desiredUsername = (meta && typeof meta.username === 'string') ? meta.username : null;
       await supabase.from('profiles').upsert({ user_id: user.id, username: desiredUsername });
 
+      // Route based on subscription
       const { data } = await supabase
         .from('subscriptions')
         .select('status,current_period_end')

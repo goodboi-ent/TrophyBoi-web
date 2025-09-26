@@ -84,7 +84,7 @@ export default function LoginPage() {
       {err && <p className="text-red-600">Error: {err}</p>}
 
       <p className="text-sm">
-        Don't have an account? <a className="underline" href="/signup">Create one</a>
+        Don&amp;apos;t have an account? <a className="underline" href="/signup">Create one</a>
       </p>
     </main>
   );
