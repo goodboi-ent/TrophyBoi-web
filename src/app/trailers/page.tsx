@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '../../lib/supabaseClient'; // relative to src/app/trailers
+import { supabase } from '../../lib/supabaseClient'; // if you prefer alias, use: '@/lib/supabaseClient'
 import MuxPlayer from '@mux/mux-player-react';
 
 export const dynamic = 'force-dynamic';
@@ -18,10 +18,13 @@ export default function TrailersPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Age-gate flag in localStorage
+  // Age-gate check: cookie first, fallback to localStorage
   useEffect(() => {
-    const ok = typeof window !== 'undefined' && window.localStorage.getItem('age_ok_v1') === '1';
-    setAgeOk(ok);
+    if (typeof document !== 'undefined') {
+      const hasCookie = document.cookie.includes('age_ok_v1=1');
+      const hasLS = window.localStorage.getItem('age_ok_v1') === '1';
+      setAgeOk(hasCookie || hasLS);
+    }
   }, []);
 
   // Load trailers only (public)
@@ -38,11 +41,17 @@ export default function TrailersPage() {
     })();
   }, []);
 
-  function confirmAge() {
+  // Confirm age: set cookie via API and also set localStorage
+  async function confirmAge() {
+    try {
+      await fetch('/api/age/confirm', { method: 'POST' });
+    } catch {
+      // ignore network errors; we'll still set LS so the UI proceeds
+    }
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('age_ok_v1', '1');
-      setAgeOk(true);
     }
+    setAgeOk(true);
   }
 
   return (
@@ -66,7 +75,9 @@ export default function TrailersPage() {
             <h2 className="text-xl font-bold">Age Verification</h2>
             <p>You must be 18+ to view trailers on this site.</p>
             <div className="flex gap-3">
-              <button className="border rounded px-4 py-2" onClick={confirmAge}>I am 18 or older</button>
+              <button className="border rounded px-4 py-2" onClick={confirmAge}>
+                I am 18 or older
+              </button>
               <a className="underline px-4 py-2" href="/">Leave</a>
             </div>
           </div>
