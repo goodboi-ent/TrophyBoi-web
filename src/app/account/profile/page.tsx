@@ -1,6 +1,7 @@
 'use client';
 
 import SignOutButton from '../../../components/SignOutButton';
+import LinkXButton from '../../../components/LinkXButton'; // <-- add this
 import { useEffect, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../../../lib/supabaseClient';
@@ -62,29 +63,52 @@ export default function ProfilePage() {
     setNewPw('');
   }
 
-  if (!user) return <main className="max-w-md mx-auto p-6">Not signed in. <a className="underline" href="/login">Log in</a></main>;
-  if (!p) return <main className="max-w-md mx-auto p-6">Loading…</main>;
+  if (!user) {
+    return (
+      <main className="max-w-md mx-auto p-6">
+        Not signed in. <a className="underline" href="/login">Log in</a>
+      </main>
+    );
+  }
+  if (!p) {
+    return <main className="max-w-md mx-auto p-6">Loading…</main>;
+  }
 
   return (
     <main className="max-w-md mx-auto p-6 space-y-6">
       <h1 className="text-2xl font-bold">Your Profile</h1>
-<h1 className="text-2xl font-bold">Your Profile</h1>
-<div className="mt-2">
-  <SignOutButton />
-</div>
+
+      {/* Actions under the heading */}
+      <div className="flex items-center gap-3">
+        <SignOutButton />
+        <LinkXButton /> {/* <-- here's the X linking button */}
+      </div>
 
       <form onSubmit={saveProfile} className="space-y-3">
         <label className="block">
           <span className="text-sm">Username</span>
-          <input value={p.username ?? ''} onChange={e=>setP({...p, username: e.target.value})} className="mt-1 w-full border rounded p-2" />
+          <input
+            value={p.username ?? ''}
+            onChange={e => setP({ ...(p as Profile), username: e.target.value })}
+            className="mt-1 w-full border rounded p-2"
+          />
         </label>
         <label className="block">
           <span className="text-sm">Display name</span>
-          <input value={p.display_name ?? ''} onChange={e=>setP({...p, display_name: e.target.value})} className="mt-1 w-full border rounded p-2" />
+          <input
+            value={p.display_name ?? ''}
+            onChange={e => setP({ ...(p as Profile), display_name: e.target.value })}
+            className="mt-1 w-full border rounded p-2"
+          />
         </label>
         <label className="block">
           <span className="text-sm">Avatar URL</span>
-          <input value={p.avatar_url ?? ''} onChange={e=>setP({...p, avatar_url: e.target.value})} className="mt-1 w-full border rounded p-2" placeholder="https://…" />
+          <input
+            value={p.avatar_url ?? ''}
+            onChange={e => setP({ ...(p as Profile), avatar_url: e.target.value })}
+            className="mt-1 w-full border rounded p-2"
+            placeholder="https://…"
+          />
         </label>
         <button type="submit" className="border rounded px-4 py-2">Save profile</button>
       </form>
@@ -92,7 +116,13 @@ export default function ProfilePage() {
       <form onSubmit={changePassword} className="space-y-3">
         <label className="block">
           <span className="text-sm">New password</span>
-          <input type="password" value={newPw} onChange={e=>setNewPw(e.target.value)} className="mt-1 w-full border rounded p-2" required />
+          <input
+            type="password"
+            value={newPw}
+            onChange={e => setNewPw(e.target.value)}
+            className="mt-1 w-full border rounded p-2"
+            required
+          />
         </label>
         <button type="submit" className="border rounded px-4 py-2">Change password</button>
       </form>
@@ -104,3 +134,4 @@ export default function ProfilePage() {
     </main>
   );
 }
+
